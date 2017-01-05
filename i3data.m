@@ -2,7 +2,7 @@
 
 %kinda global
 g = 9.81;
-incl = 0; %.45; %1736;
+incl = 0.1736;
 Vrange = 0:150; %%% In KM/H YOU STUPID FUCK! :D
 a = 0; %start with this, update later
 
@@ -17,7 +17,7 @@ Cr = 0.006; % "sub 0.0065" maybe try with less to see.
 tireD = 20*0.0245+2*0.175*0.55;%*2/3; % times 2/3 for effective real tire radius
 tireR = tireD / 2;
 
-motorToWheelRatio = 9.7;
+motorToWheelRatio = 9.7; %gear ratio between motor and driveshaft
 
 
 
@@ -68,7 +68,7 @@ vCar(iterStep) = 80; % in km/h, remember to translate to m/s if you want to do a
 pCar(iterStep) = -(25+8); %25.25 meters + 2 car lengths
 
 %f = ma shit
-tStep = 0.1;
+tStep = 0.0001;
 %need to get car length + 2 car lengths in front (4 * 3m) for safe overtake
 while pCar < 12;
     %for speed10=Vcar*10:1500 %maybe make this robust for different vmaxes
@@ -79,7 +79,7 @@ while pCar < 12;
 %     end
     fDiff(iterStep) = loadDiff; 
     fUsed(iterStep) = i3wheelSpdkmh10thsteps(round(vCar(iterStep),1)*10,2);
-    fLoad(iterStep) = (i3wheelLoadkmh10thsteps(round(vCar(iterStep),1)*10) + m*a);
+    fLoad(iterStep) = (i3wheelLoadkmh10thsteps(round(vCar(iterStep),1)*10) + m*a); %here the ma can be, because plots.
     a = fDiff(iterStep) / m;
     vCar(iterStep+1) = (vCar(iterStep)/3.6 + a*tStep)*3.6; %haxx haxx.
     vDiff = vCar(iterStep+1) - vTruck;
@@ -90,9 +90,12 @@ while pCar < 12;
     %but update load in this step due to accel from previous no do this up
     %there
 end
-
-maLoad = movmean(fLoad,20);
-maFdiff = movmean(fDiff,20);
+%% add the coast down
+a=0;
+fUsed(iterStep) = i3wheelSpdkmh10thsteps(round(vCar(iterStep),1)*10,2);
+fLoad(iterStep) = (i3wheelLoadkmh10thsteps(round(vCar(iterStep),1)*10) + m*a);
+% maLoad = movmean(fLoad,20);
+% maFdiff = movmean(fDiff,20);
 
 %% plotting
 
@@ -105,14 +108,14 @@ plot(Vrange,Ftrac,'DisplayName','Steady state load')
 xlabel({'Speed (km/h)'},'FontSize',11);
 % Create ylabel
 ylabel({'Wheel Force (N)'},'FontSize',11);
-plot(vCar(1:end-10),fUsed(1:end-9),'DisplayName','F_{used}')
-plot(vCar(1:end-10),maLoad(1:end-9),'DisplayName','F_{load}')
+plot(vCar(1:end),fUsed(1:end),'DisplayName','F_{used}')
+plot(vCar(1:end),fLoad(1:end),'DisplayName','F_{load}')
 
 figure
-plot(vCar(1:end-10),fUsed(1:end-9),'DisplayName','F_{used}')
+plot(vCar(1:end),fUsed(1:end),'DisplayName','F_{used}')
 hold on
-plot(vCar(1:end-10),maLoad(1:end-9),'DisplayName','F_{load}')
-plot(vCar(1:end-10),maFdiff(1:end-9),'DisplayName','F_{diff}')
+plot(vCar(1:end),fLoad(1:end),'DisplayName','F_{load}')
+plot(vCar(1:end),fDiff(1:end),'DisplayName','F_{diff}')
 % Create xlabel
 xlabel({'Speed (km/h)'},'FontSize',11);
 % Create ylabel
