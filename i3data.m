@@ -79,7 +79,7 @@ while pCar < 12;
     a = fDiff(iterStep) / m;
     vCar(iterStep+1) = (vCar(iterStep)/3.6 + a*tStep)*3.6; %haxx haxx.
     vDiff = vCar(iterStep+1) - vTruck;
-    pCar(iterStep+1) = pCar(iterStep) + vDiff*tStep; %the real tStep
+    pCar(iterStep+1) = pCar(iterStep) + vDiff/3.6*tStep; %because meters per second is important
     
     %go to next timestep
     iterStep=iterStep+1;
