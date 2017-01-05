@@ -2,7 +2,7 @@
 
 %kinda global
 g = 9.81;
-incl = 0.45; %.1736;
+incl = 0.1736;
 Vrange = 0:150; %%% In KM/H YOU STUPID FUCK! :D
 a = 0; %start with this, update later
 
