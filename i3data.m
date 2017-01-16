@@ -1,89 +1,73 @@
+%%%%% A FS car tries to accelerate and a driver is heavier than the other
+%%%%% so.... here is some seach or something.
 %%% Vehicle data Car:
 
 %kinda global
 g = 9.81;
-incl = 0.1736;
-Vrange = 0:150; %%% In KM/H YOU STUPID FUCK! :D
+incl = 0;
+Vrange = 0:0.01:150; %%% In KM/H YOU STUPID FUCK! :D
 a = 0; %start with this, update later
 
-%kinda i3:
-m = 1200;
+for mdiff = 1:5:200
+m = 600+mdiff;
 Cd = 0.29;
 A = 2.38;
 CdA = Cd*A;
 rhoAir = 1.2;
 Cr = 0.006; % "sub 0.0065" maybe try with less to see.
-% 175/60 R19 or 175/55 R20
-tireD = 20*0.0245+2*0.175*0.55;%*2/3; % times 2/3 for effective real tire radius
+tireD = 18*0.0245; %kinda hoosier R25 10" ?
 tireR = tireD / 2;
 
 motorToWheelRatio = 9.7; %gear ratio between motor and driveshaft
+%%% add real gears later
 
-
-
+%%% Road load calcs
 for i=1:length(Vrange)
-    Froll = Cr * m * g;
-    Fdrag = Cd*A*rhoAir*(Vrange(i)/3.6)^2/2; % grab instantaneous V-thing.
-    Fincl = m * g * incl;
-    Fm = m * a;
-
-    Ftrac(i) = Froll + Fdrag + Fincl + Fm; % maybe add Ffrict
+%     Froll = Cr * m * g;
+%     Fdrag = Cd*A*rhoAir*(Vrange(i)/3.6)^2/2; % grab instantaneous V-thing.
+%     Fincl = m * g * incl;
+%     %Fm = m * a; %yeah this... yeah... dealt with in the loop
+    Ftrac(i) = 0; %Froll + Fdrag + Fincl; %add friction limit
 end
 
 
-%Torque speed curve for i3
-load('i3speedTorque.mat');
+%Fastest Accel FScar with 25 kW
+omegaMachine = Vrange / 3.6 * tireD * pi * motorToWheelRatio;
 
-i3wheelSpdTq(:,1) = i3speedTorque(:,1)*(2*pi/60)/9.7;
-i3wheelSpdTq(:,2) = i3speedTorque(:,2)*9.7;
+power = 25e3; %25 kw
 
-i3wheelSpdForce(:,1) = i3wheelSpdTq(:,1);
-i3wheelSpdForce(:,2) = i3wheelSpdTq(:,2)/tireR;
+tq = power ./ omegaMachine; %machine torque
 
-i3machineSpeedPower = i3speedTorque(:,1)*(2*pi/60).*i3speedTorque(:,2);
-i3wheelSpdkmh = i3wheelSpdForce(:,1) / (2*pi/60) * tireD * pi * 60 / 1000 ;
+%roadload is Ftrac
+tqRoadForce = tq / (tireR * motorToWheelRatio / 3.6);
 
-
-i3wheelSpdkmh10thsteps(:,1) = 0:0.1:150; %1 is speeds
-i3wheelSpdkmh10thsteps(:,2) = interp1(i3wheelSpdkmh, i3wheelSpdForce(:,2),i3wheelSpdkmh10thsteps(:,1));
-i3wheelLoadkmh10thsteps = interp1(Vrange,Ftrac,i3wheelSpdkmh10thsteps(:,1));
-
-%%% Vehicle data Truck:
-
-%fill this with fun info about a truck
-mTruck = 60000; %or something like this?
-
-
-
-
-
-
-%fix Vtruck
-vTruck = 80;
 % init vcar 80 km/h
 iterStep = 1; %one is zero, just so you know. durrp
 %vCar = zeros(1e5,1); %pre allocate, maybe dangerous?
 %pCar = zeros(1e5,1); %pre allocate, maybe dangerous?
-vCar(iterStep) = 80; % in km/h, remember to translate to m/s if you want to do anything useful
-pCar(iterStep) = -(25+8); %25.25 meters + 2 car lengths
+vCar(iterStep,mdiff) = 0; % in km/h, remember to translate to m/s if you want to do anything useful
+pCar(iterStep,mdiff) = 0; %25.25 meters + 2 car lengths
 
 %f = ma shit
 tStep = 0.0001;
 %need to get car length + 2 car lengths in front (4 * 3m) for safe overtake
-while pCar < 12;
+while pCar(:,mdiff) < 75;
     %for speed10=Vcar*10:1500 %maybe make this robust for different vmaxes
     iterStep;
-    loadDiff = i3wheelSpdkmh10thsteps(round(vCar(iterStep),1)*10,2) - (i3wheelLoadkmh10thsteps(round(vCar(iterStep),1)*10)); %; %% + m*a should not be here because thats what all of this is about.
-%     if loadDiff < 0; %%% ugliest hax today. and there has been a lot of them.
-%         loadDiff = 0;
-%     end
-    fDiff(iterStep) = loadDiff; 
-    fUsed(iterStep) = i3wheelSpdkmh10thsteps(round(vCar(iterStep),1)*10,2);
-    fLoad(iterStep) = (i3wheelLoadkmh10thsteps(round(vCar(iterStep),1)*10) + m*a); %here the ma can be, because plots.
-    a = fDiff(iterStep) / m;
-    vCar(iterStep+1) = (vCar(iterStep)/3.6 + a*tStep)*3.6; %haxx haxx.
-    vDiff = vCar(iterStep+1) - vTruck;
-    pCar(iterStep+1) = pCar(iterStep) + vDiff/3.6*tStep; %because meters per second is important
+    %%% semihax to avoid unpleasant things
+    if vCar(iterStep) < 1;
+        vLookup = 2;
+    else
+        vLookup = round(vCar(iterStep,mdiff),1)*10;
+    end
+    loadDiff = tqRoadForce(vLookup); %ignore atm - Ftrac(vLookup);
+    fDiff(iterStep,mdiff) = loadDiff; 
+    fUsed(iterStep,mdiff) = tqRoadForce(vLookup);
+    fLoad(iterStep,mdiff) = Ftrac(vLookup) + m*a; %here the ma can be, because plots.
+    a = fDiff(iterStep,mdiff) / m;
+    vCar(iterStep+1,mdiff) = (vCar(iterStep,mdiff)/3.6 + a*tStep)*3.6; %really should be using m/s
+    vDiff = vCar(iterStep+1,mdiff); % - vTruck; %i guess keep if you wanna race against something
+    pCar(iterStep+1,mdiff) = pCar(iterStep,mdiff) + vCar(iterStep,mdiff)/3.6*tStep; %because meters per second is important
     
     %go to next timestep
     iterStep=iterStep+1;
@@ -92,36 +76,47 @@ while pCar < 12;
 end
 %% add the coast down
 a=0;
-fUsed(iterStep) = i3wheelSpdkmh10thsteps(round(vCar(iterStep),1)*10,2);
-fLoad(iterStep) = (i3wheelLoadkmh10thsteps(round(vCar(iterStep),1)*10) + m*a);
-% maLoad = movmean(fLoad,20);
-% maFdiff = movmean(fDiff,20);
+fUsed(iterStep,mdiff) = Ftrac(vLookup);
+fLoad(iterStep,mdiff) = Ftrac(vLookup) + m*a;
+
+end
+
+
+for j = 1:length(vCar(1,:))
+    loopVar = 3;
+    while vCar(loopVar,j) > 1
+        loopVar = loopVar +1;
+    end
+    finalTstep(j) = loopVar;
+end
+        
+
 
 %% plotting
 
-figure
+% figure
+% 
+% plot(Vrange,tqRoadForce,'DisplayName','Available')
+% hold on
+% plot(Vrange,Ftrac,'DisplayName','Steady state load')
+% % Create xlabel
+% xlabel({'Speed (km/h)'},'FontSize',11);
+% % Create ylabel
+% ylabel({'Wheel Force (N)'},'FontSize',11);
+% plot(vCar(1:end),fUsed(1:end),'DisplayName','F_{used}')
+% plot(vCar(1:end),fLoad(1:end),'DisplayName','F_{load}')
 
-plot(i3wheelSpdkmh10thsteps(:,1),i3wheelSpdkmh10thsteps(:,2),'DisplayName','Available')
-hold on
-plot(Vrange,Ftrac,'DisplayName','Steady state load')
-% Create xlabel
-xlabel({'Speed (km/h)'},'FontSize',11);
-% Create ylabel
-ylabel({'Wheel Force (N)'},'FontSize',11);
-plot(vCar(1:end),fUsed(1:end),'DisplayName','F_{used}')
-plot(vCar(1:end),fLoad(1:end),'DisplayName','F_{load}')
-
-figure
-plot(vCar(1:end),fUsed(1:end),'DisplayName','F_{used}')
-hold on
-plot(vCar(1:end),fLoad(1:end),'DisplayName','F_{load}')
-plot(vCar(1:end),fDiff(1:end),'DisplayName','F_{diff}')
-% Create xlabel
-xlabel({'Speed (km/h)'},'FontSize',11);
-% Create ylabel
-ylabel({'Wheel force (N)'},'FontSize',11);
-legend1 = legend('show');
-set(legend1,'Location','southwest');
+% figure
+% plot(vCar(1:end),fUsed(1:end),'DisplayName','F_{used}')
+% hold on
+% plot(vCar(1:end),fLoad(1:end),'DisplayName','F_{load}')
+% plot(vCar(1:end),fDiff(1:end),'DisplayName','F_{diff}')
+% % Create xlabel
+% xlabel({'Speed (km/h)'},'FontSize',11);
+% % Create ylabel
+% ylabel({'Wheel force (N)'},'FontSize',11);
+% legend1 = legend('show');
+% set(legend1,'Location','southwest');
 % scatter(80,2319)
 % scatter(80.25,5643)
 % scatter(110,3814)
